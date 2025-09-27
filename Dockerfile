@@ -1,10 +1,13 @@
-# Use Node.js LTS version
-FROM node:20-slim
+# Use Node.js 18 Alpine
+FROM node:18-alpine
 
-# Install system dependencies for Sharp
-RUN apt-get update && apt-get install -y \
-    libvips-dev \
-    && rm -rf /var/lib/apt/lists/*
+# Install system dependencies for Sharp and build tools
+RUN apk add --no-cache \
+    vips-dev \
+    python3 \
+    make \
+    g++ \
+    libc6-compat
 
 # Create app directory
 WORKDIR /usr/src/app
