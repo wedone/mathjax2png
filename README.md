@@ -28,6 +28,20 @@ npm start
 
 ### Docker 部署
 
+你可以通过以下两种方式使用 Docker：
+
+#### 方式一：从 GitHub Container Registry 拉取镜像
+
+```bash
+# 拉取镜像
+docker pull ghcr.io/wedone/mathjax2png:latest
+
+# 运行容器
+docker run -p 3000:3000 ghcr.io/wedone/mathjax2png:latest
+```
+
+#### 方式二：本地构建
+
 1. 构建 Docker 镜像：
 ```bash
 docker build -t mathjax2png .
@@ -38,7 +52,7 @@ docker build -t mathjax2png .
 docker run -p 3000:3000 mathjax2png
 ```
 
-3. 访问 http://localhost:3000 使用应用
+访问 http://localhost:3000 使用应用
 
 ## API 使用
 
