@@ -1,0 +1,16 @@
+vercel-app
+├── src
+│   ├── pages
+│   │   ├── _app.tsx
+│   │   ├── index.tsx
+│   │   └── api
+│   │       └── hello.ts
+│   ├── styles
+│   │   └── globals.css
+│   └── components
+│       └── Layout.tsx
+├── public
+├── package.json
+├── tsconfig.json
+├── next.config.js
+└── README.md

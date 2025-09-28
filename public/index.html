@@ -180,7 +180,7 @@
             if (!content) return;
 
             const options = getOptions();
-            const api = currentMode === 'formula' ? '/convert' : '/convert-mixed';
+            const api = currentMode === 'formula' ? '/api/convert' : '/api/convert-mixed';
             const body = currentMode === 'formula' 
                 ? { formula: content, options } 
                 : { content, options };
@@ -199,9 +199,9 @@
                 const resultWrap = document.getElementById('resultWrap');
                 
                 if (currentMode === 'formula') {
-                    // 单个公式模式
+                    // 单个公式模式 - 使用 base64 数据
                     resultWrap.innerHTML = `<img src="${result.url}" class="preview" alt="公式预览" />`;
-                    document.getElementById('apiLink').value = window.location.origin + result.url;
+                    document.getElementById('apiLink').value = result.url;
                 } else {
                     // 混合模式
                     resultWrap.innerHTML = '';
@@ -215,7 +215,7 @@
                             container.appendChild(span);
                         } else {
                             const img = document.createElement('img');
-                            img.src = part.url;
+                            img.src = part.base64; // 使用 base64 数据
                             img.alt = part.content;
                             img.className = 'preview';
                             container.appendChild(img);
@@ -238,7 +238,7 @@
             if (!formula) return;
 
             try {
-                const res = await fetch('/png', {
+                const res = await fetch('/api/png', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -249,8 +249,16 @@
 
                 if (!res.ok) throw new Error('Failed to generate');
                 
-                // 直接在新窗口打开图片
-                window.open(res.url, '_blank');
+                // 在 Vercel 环境中，我们直接下载图片
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'formula.png';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
             } catch (err) {
                 console.error('Error:', err);
             }
@@ -333,21 +341,21 @@
                         code = parts.map(part => 
                             part.type === 'text' 
                                 ? part.content 
-                                : `<img src="${part.url}" alt="${part.content}" />`
+                                : `<img src="${part.base64}" alt="${part.content}" />`
                         ).join('');
                         break;
                     case 'markdown':
                         code = parts.map(part => 
                             part.type === 'text' 
                                 ? part.content 
-                                : `![${part.content}](${part.url})`
+                                : `![${part.content}](${part.base64})`
                         ).join('');
                         break;
                     case 'bbcode':
                         code = parts.map(part => 
                             part.type === 'text' 
                                 ? part.content 
-                                : `[img]${part.url}[/img]`
+                                : `[img]${part.base64}[/img]`
                         ).join('');
                         break;
                 }
