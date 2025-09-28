@@ -3,17 +3,26 @@ const sharp = require('sharp');
 
 // 初始化 MathJax（仅在首次加载时）
 let initialized = false;
+let initPromise = null;
+
 async function initMathJax() {
     if (!initialized) {
-        mjAPI.config({
-            MathJax: {
-                SVG: {
-                    font: 'TeX'
-                }
-            }
-        });
-        mjAPI.start();
-        initialized = true;
+        if (!initPromise) {
+            initPromise = (async () => {
+                mjAPI.config({
+                    MathJax: {
+                        SVG: {
+                            font: 'TeX',
+                            useFontCache: true,
+                            useGlobalCache: true
+                        }
+                    }
+                });
+                await mjAPI.start();
+                initialized = true;
+            })();
+        }
+        await initPromise;
     }
 }
 
