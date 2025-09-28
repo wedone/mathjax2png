@@ -21,6 +21,12 @@
         .codebox{background:#f6f8fa;border:1px dashed var(--border);padding:8px;border-radius:6px;white-space:pre-wrap}
         .status{color:var(--muted);font-size:0.9rem;margin-top:8px}
         img.preview{max-width:100%;border:1px solid var(--border);border-radius:6px;background:#fff}
+        .mode-switch{margin-bottom:15px;display:flex;gap:10px;justify-content:center}
+        .mode-btn{padding:10px 20px;border:2px solid var(--accent);border-radius:6px;cursor:pointer;opacity:0.7}
+        .mode-btn.active{background:var(--accent);color:#fff;opacity:1}
+        .mixed-preview{display:flex;flex-direction:column;gap:10px}
+        .mixed-preview span{line-height:1.5}
+        .mixed-preview img{vertical-align:middle;margin:0 4px}
     </style>
 </head>
 <body>
@@ -28,11 +34,18 @@
         <h1>MathJax → PNG 转换器</h1>
         <p class="lead" style="color:var(--muted);margin-top:6px">左侧输入公式与设置；右侧预览与导出</p>
 
+        <div class="mode-switch">
+            <div class="mode-btn" data-mode="formula">公式转换</div>
+            <div class="mode-btn active" data-mode="mixed">混合文本</div>
+        </div>
+
         <div class="main" style="margin-top:14px">
             <div>
                 <div class="panel">
-                    <label for="formula"><strong>输入（支持 $...$, $$...$$, \(...\), \[...\]）</strong></label>
-                    <textarea id="formula" placeholder="在此输入 TeX / 混合文本..."></textarea>
+                    <label for="formula"><strong id="input-label">输入（支持文本与公式混合，公式使用 $...$, $$...$$）</strong></label>
+                    <textarea id="formula" placeholder="在此输入文本和公式...
+
+例如：这是一个行内公式 $E=mc^2$ 和一个独立公式 $$\\frac{a}{b}$$"></textarea>
                 </div>
 
                 <div style="height:12px"></div>
@@ -58,7 +71,7 @@
                         <label style="margin-left:8px">背景</label>
                         <input id="bgcolor" type="color" value="#ffffff" />
                         <label style="margin-left:8px">透明</label>
-                        <input id="transparent" type="checkbox" />
+                        <input id="transparent" type="checkbox" checked />
                     </div>
 
                     <div class="row" style="margin-top:6px">
@@ -68,8 +81,8 @@
                     </div>
 
                     <div style="margin-top:8px" class="examples">
-                        <div class="example-item" data-formula="E=mc^2" style="cursor:pointer;color:var(--accent)">示例：E=mc^2</div>
-                        <div class="example-item" data-formula="\\frac{a}{b}" style="cursor:pointer;color:var(--accent)">示例：\\frac{a}{b}</div>
+                        <div class="example-item" data-formula="这是文本 $E=mc^2$ 和独立公式 $$\\sum_{i=1}^n i$$" style="cursor:pointer;color:var(--accent)">示例：混合文本和公式</div>
+                        <div class="example-item" data-formula="\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}" style="cursor:pointer;color:var(--accent)">示例：二次方程解</div>
                     </div>
                 </div>
             </div>
@@ -81,7 +94,7 @@
                         <div style="color:var(--muted)">尚无预览</div>
                     </div>
 
-                    <div style="margin-top:12px">
+                    <div id="linkSection" style="margin-top:12px">
                         <h3 style="margin:4px 0">图片链接</h3>
                         <div style="display:flex;gap:8px;align-items:center">
                             <input id="apiLink" type="text" readonly class="url-input" placeholder="生成的图片链接" />
@@ -99,121 +112,263 @@
                             <select id="exportFormat">
                                 <option value="simplehtml">简单 HTML</option>
                                 <option value="markdown">Markdown</option>
+                                <option value="bbcode">BBCode</option>
                             </select>
-                            <div style="margin-left:auto;display:flex;gap:8px">
-                                <button class="btn" id="downloadBtn">下载 PNG</button>
-                                <button class="btn secondary" id="embedBtn">复制嵌入代码</button>
-                            </div>
+                            <button class="btn secondary" id="copyFormatBtn">复制</button>
                         </div>
-                        <div id="embedBox" style="margin-top:8px">
-                            <div class="codebox" id="embedCode" style="display:none"></div>
-                        </div>
+                        <div id="exportCode" class="codebox" style="margin-top:8px;display:none"></div>
                     </div>
-
-                    <div class="status" id="status">就绪</div>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function(){
-            const $ = id => document.getElementById(id);
-            const setStatus = s => { const el = $('status'); if(el) el.textContent = s; };
+        let currentMode = 'mixed';  // 默认为混合模式
+        let lastResult = null;      // 存储最后一次转换结果
 
-            function collectOptions(){
-                const dpi = Number($('dpi')?.value) || undefined;
-                const scale = Number($('scale')?.value) || undefined;
-                const width = Number($('width')?.value) || undefined;
-                const height = Number($('height')?.value) || undefined;
-                const color = $('color')?.value || undefined;
-                const bgcolor = $('bgcolor')?.value || undefined;
-                const transparent = !!$('transparent')?.checked;
-                const opts = { dpi, scale, width, height, color, bgcolor, transparent };
-                Object.keys(opts).forEach(k=>opts[k]===undefined && delete opts[k]);
-                return opts;
-            }
+        // 获取选项值
+        function getOptions() {
+            return {
+                dpi: document.getElementById('dpi').value,
+                scale: document.getElementById('scale').value,
+                width: document.getElementById('width').value || undefined,
+                height: document.getElementById('height').value || undefined,
+                color: document.getElementById('color').value,
+                bgcolor: document.getElementById('bgcolor').value,
+                transparent: document.getElementById('transparent').checked
+            };
+        }
 
-            function validateFormula(formula){
-                const errors = [];
-                if(!formula || !String(formula).trim()){ errors.push('公式为空'); return { ok:false, errors }; }
-                let depth = 0;
-                for(let i=0;i<formula.length;i++){ const ch = formula[i]; if(ch==='{') depth++; else if(ch==='}') { depth--; if(depth<0){ errors.push("多余右括号 '}'"); break; } } }
-                if(depth>0) errors.push('检测到未闭合的大括号');
-                const dollar = (String(formula).match(/\$/g)||[]).length; if(dollar%2===1) errors.push('检测到不配对的 $');
-                return { ok: errors.length===0, errors, longWarn: formula.length>1200 };
-            }
+        // 切换模式
+        document.querySelector('.mode-switch').addEventListener('click', (e) => {
+            if (e.target.classList.contains('mode-btn')) {
+                const newMode = e.target.dataset.mode;
+                if (newMode === currentMode) return;
 
-            async function previewPNG(){
-                const ta = $('formula'); const formula = ta ? ta.value : '';
-                const v = validateFormula(formula); if(!v.ok){ setStatus('公式校验失败: '+v.errors.join('；')); return; }
-                setStatus('渲染中...');
-                const opts = collectOptions();
-                try{
-                    const res = await fetch('/png', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ formula, options: opts }) });
-                    if(!res.ok) throw new Error('渲染失败');
-                    const buf = await res.arrayBuffer(); const blob = new Blob([buf],{type:'image/png'}); const url = URL.createObjectURL(blob);
-                    const wrap = $('resultWrap'); if(wrap) wrap.innerHTML = `<img class="preview" id="resultImg" src="${url}" alt="preview"/>`;
-                    if($('apiLink')) $('apiLink').value = '';
-                    setStatus('渲染完成');
-                }catch(err){ console.error(err); setStatus('渲染失败'); }
-            }
+                // 更新按钮状态
+                document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+                e.target.classList.add('active');
 
-            function generateLink(){
-                const ta = $('formula'); const formula = ta ? ta.value : '';
-                const v = validateFormula(formula); if(!v.ok){ setStatus('公式校验失败: '+v.errors.join('；')); return; }
-                setStatus('生成链接中...');
-                const opts = collectOptions();
-                try{
-                    const qp = new URLSearchParams(); qp.set('formula', formula);
-                    Object.entries(opts).forEach(([k,v])=>{ if(v!==undefined) qp.set(k,String(v)); });
-                    const getLink = `${location.origin}/png?${qp.toString()}`;
-                    const b64 = btoa(unescape(encodeURIComponent(formula))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
-                    const b64Link = `${location.origin}/png/b64/${b64}`;
-                    if($('apiLink')) $('apiLink').value = getLink;
-                    const wrap = $('resultWrap'); if(wrap) wrap.innerHTML = `<img class="preview" id="resultImg" src="${getLink}" alt="preview"/>`;
-                    setStatus('已生成链接');
-                }catch(e){ console.error(e); setStatus('生成失败'); }
-            }
+                // 更新模式
+                currentMode = newMode;
 
-            // event bindings
-            const previewBtn = $('previewBtn'); const linkBtn = $('linkBtn'); const clearBtn = $('clearBtn');
-            previewBtn && previewBtn.addEventListener('click', previewPNG);
-            linkBtn && linkBtn.addEventListener('click', generateLink);
-            clearBtn && clearBtn.addEventListener('click', ()=>{ if($('formula')) $('formula').value=''; const wrap=$('resultWrap'); if(wrap) wrap.innerHTML='<div style="color:var(--muted)">尚无预览</div>'; if($('apiLink')) $('apiLink').value=''; setStatus('已清除'); });
+                // 更新界面
+                const inputLabel = document.getElementById('input-label');
+                const formula = document.getElementById('formula');
+                const linkSection = document.getElementById('linkSection');
 
-            document.addEventListener('click', (e)=>{
-                const t = e.target;
-                if(t && t.classList && t.classList.contains('example-item')){
-                    const f = t.dataset.formula || t.textContent || '';
-                    if($('formula')) $('formula').value = f; setStatus('已插入示例公式');
-                }
-            });
-
-            const copyLinkBtn = $('copyLinkBtn'); copyLinkBtn && copyLinkBtn.addEventListener('click', ()=>{ const v = $('apiLink')?.value; if(!v){ setStatus('无链接可复制'); return; } navigator.clipboard.writeText(v).then(()=>setStatus('已复制链接')).catch(()=>setStatus('复制失败')); });
-            const copyB64Btn = $('copyB64Btn'); copyB64Btn && copyB64Btn.addEventListener('click', ()=>{ const formula = $('formula')?.value || ''; if(!formula.trim()){ setStatus('没有公式可编码'); return; } const b = btoa(unescape(encodeURIComponent(formula))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); const link = `${location.origin}/png/b64/${b}`; navigator.clipboard.writeText(link).then(()=>setStatus('已复制 base64 链接')).catch(()=>setStatus('复制失败')); });
-
-            const downloadBtn = $('downloadBtn'); downloadBtn && downloadBtn.addEventListener('click', ()=>{
-                const img = $('resultImg'); if(!img || !img.src){ setStatus('没有可下载的图片'); return; }
-                const a = document.createElement('a'); a.href = img.src; a.download = 'formula.png'; document.body.appendChild(a); a.click(); a.remove(); setStatus('下载完成');
-            });
-
-            const embedBtn = $('embedBtn'); embedBtn && embedBtn.addEventListener('click', ()=>{
-                const format = $('exportFormat')?.value || 'simplehtml'; const wrap = $('resultWrap'); const html = wrap ? wrap.innerHTML : '';
-                if(!html){ setStatus('无内容可导出'); return; }
-                if(format === 'markdown'){
-                    const m = html.match(/<img[^>]+src\s*=\s*"([^"]+)"/i);
-                    const md = m ? `![](${m[1]})` : html.replace(/<[^>]+>/g,'');
-                    const code = $('embedCode'); if(code){ code.textContent = md; code.style.display='block'; }
-                    navigator.clipboard.writeText(md).then(()=>setStatus('已复制嵌入代码')).catch(()=>setStatus('复制失败'));
+                if (currentMode === 'formula') {
+                    inputLabel.textContent = '输入（LaTeX 公式）';
+                    formula.placeholder = '在此输入 LaTeX 公式...\n\n例如：E=mc^2 或 \\frac{a}{b}';
+                    linkSection.style.display = 'block';
                 } else {
-                    const simple = html.replace(/\s*style=\"[^\"]*\"/g,''); const code = $('embedCode'); if(code){ code.textContent = simple; code.style.display='block'; }
-                    navigator.clipboard.writeText(simple).then(()=>setStatus('已复制嵌入代码')).catch(()=>setStatus('复制失败'));
+                    inputLabel.textContent = '输入（支持文本与公式混合，公式使用 $...$, $$...$$）';
+                    formula.placeholder = '在此输入文本和公式...\n\n例如：这是一个行内公式 $E=mc^2$ 和一个独立公式 $$\\frac{a}{b}$$';
+                    linkSection.style.display = 'none';
                 }
-            });
 
-            setStatus('就绪');
+                // 清空预览
+                document.getElementById('resultWrap').innerHTML = '<div style="color:var(--muted)">尚无预览</div>';
+                document.getElementById('apiLink').value = '';
+            }
         });
+
+        // 预览
+        document.getElementById('previewBtn').addEventListener('click', async () => {
+            const content = document.getElementById('formula').value;
+            if (!content) return;
+
+            const options = getOptions();
+            const api = currentMode === 'formula' ? '/convert' : '/convert-mixed';
+            const body = currentMode === 'formula' 
+                ? { formula: content, options } 
+                : { content, options };
+
+            try {
+                const res = await fetch(api, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+
+                if (!res.ok) throw new Error('转换失败');
+                const result = await res.json();
+                lastResult = result;
+
+                const resultWrap = document.getElementById('resultWrap');
+                
+                if (currentMode === 'formula') {
+                    // 单个公式模式
+                    resultWrap.innerHTML = `<img src="${result.url}" class="preview" alt="公式预览" />`;
+                    document.getElementById('apiLink').value = window.location.origin + result.url;
+                } else {
+                    // 混合模式
+                    resultWrap.innerHTML = '';
+                    const container = document.createElement('div');
+                    container.className = 'mixed-preview';
+                    
+                    result.parts.forEach(part => {
+                        if (part.type === 'text') {
+                            const span = document.createElement('span');
+                            span.textContent = part.content;
+                            container.appendChild(span);
+                        } else {
+                            const img = document.createElement('img');
+                            img.src = part.url;
+                            img.alt = part.content;
+                            img.className = 'preview';
+                            container.appendChild(img);
+                        }
+                    });
+                    
+                    resultWrap.appendChild(container);
+                }
+            } catch (err) {
+                document.getElementById('resultWrap').innerHTML = '<div style="color:red">转换失败</div>';
+                console.error('Error:', err);
+            }
+        });
+
+        // 生成链接
+        document.getElementById('linkBtn').addEventListener('click', async () => {
+            if (currentMode !== 'formula') return;
+            
+            const formula = document.getElementById('formula').value;
+            if (!formula) return;
+
+            try {
+                const res = await fetch('/png', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        formula,
+                        options: getOptions()
+                    })
+                });
+
+                if (!res.ok) throw new Error('Failed to generate');
+                
+                // 直接在新窗口打开图片
+                window.open(res.url, '_blank');
+            } catch (err) {
+                console.error('Error:', err);
+            }
+        });
+
+        // 复制链接
+        document.getElementById('copyLinkBtn').addEventListener('click', () => {
+            const link = document.getElementById('apiLink').value;
+            if (link) {
+                navigator.clipboard.writeText(link);
+                alert('链接已复制到剪贴板');
+            }
+        });
+
+        // 复制 Base64 链接
+        document.getElementById('copyB64Btn').addEventListener('click', async () => {
+            if (currentMode !== 'formula') return;
+            
+            const formula = document.getElementById('formula').value;
+            if (!formula) return;
+
+            const b64 = btoa(formula).replace(/\+/g, '-').replace(/\//g, '_');
+            const options = new URLSearchParams(getOptions()).toString();
+            const url = `${window.location.origin}/png/b64/${b64}${options ? '?' + options : ''}`;
+            
+            try {
+                await navigator.clipboard.writeText(url);
+                alert('Base64 链接已复制到剪贴板');
+            } catch (err) {
+                console.error('Error:', err);
+            }
+        });
+
+        // 清空
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            document.getElementById('formula').value = '';
+            document.getElementById('resultWrap').innerHTML = '<div style="color:var(--muted)">尚无预览</div>';
+            document.getElementById('apiLink').value = '';
+            lastResult = null;
+        });
+
+        // 示例
+        document.querySelectorAll('.example-item').forEach(item => {
+            item.addEventListener('click', () => {
+                document.getElementById('formula').value = item.dataset.formula;
+            });
+        });
+        
+        // 导出格式切换
+        document.getElementById('exportFormat').addEventListener('change', () => {
+            if (!lastResult) return;
+            const format = document.getElementById('exportFormat').value;
+            const exportCode = document.getElementById('exportCode');
+            
+            if (currentMode === 'formula') {
+                const imgUrl = document.getElementById('apiLink').value;
+                let code = '';
+                
+                switch (format) {
+                    case 'simplehtml':
+                        code = `<img src="${imgUrl}" alt="数学公式" />`;
+                        break;
+                    case 'markdown':
+                        code = `![数学公式](${imgUrl})`;
+                        break;
+                    case 'bbcode':
+                        code = `[img]${imgUrl}[/img]`;
+                        break;
+                }
+                
+                exportCode.textContent = code;
+                exportCode.style.display = 'block';
+            } else {
+                // 混合模式的导出
+                const parts = lastResult.parts;
+                let code = '';
+                
+                switch (format) {
+                    case 'simplehtml':
+                        code = parts.map(part => 
+                            part.type === 'text' 
+                                ? part.content 
+                                : `<img src="${part.url}" alt="${part.content}" />`
+                        ).join('');
+                        break;
+                    case 'markdown':
+                        code = parts.map(part => 
+                            part.type === 'text' 
+                                ? part.content 
+                                : `![${part.content}](${part.url})`
+                        ).join('');
+                        break;
+                    case 'bbcode':
+                        code = parts.map(part => 
+                            part.type === 'text' 
+                                ? part.content 
+                                : `[img]${part.url}[/img]`
+                        ).join('');
+                        break;
+                }
+                
+                exportCode.textContent = code;
+                exportCode.style.display = 'block';
+            }
+        });
+
+        // 复制导出格式
+        document.getElementById('copyFormatBtn').addEventListener('click', () => {
+            const code = document.getElementById('exportCode').textContent;
+            if (code) {
+                navigator.clipboard.writeText(code);
+                alert('已复制到剪贴板');
+            }
+        });
+
+        // 禁用浏览器默认的拖放行为
+        document.addEventListener('dragover', e => e.preventDefault());
+        document.addEventListener('drop', e => e.preventDefault());
     </script>
 </body>
 </html>

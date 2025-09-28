@@ -31,6 +31,43 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
+// Helper: 解析混合内容，返回文本和公式的数组
+function parseMixedContent(content) {
+    const parts = [];
+    let currentIndex = 0;
+    const regex = /(\$\$[\s\S]*?\$\$|\$[^\$\n]+?\$)/g;
+    let match;
+
+    while ((match = regex.exec(content)) !== null) {
+        // 添加公式前的文本（如果有）
+        if (match.index > currentIndex) {
+            parts.push({
+                type: 'text',
+                content: content.slice(currentIndex, match.index)
+            });
+        }
+        
+        // 添加公式
+        parts.push({
+            type: 'formula',
+            content: match[1],
+            isDisplay: match[1].startsWith('$$')
+        });
+        
+        currentIndex = match.index + match[1].length;
+    }
+
+    // 添加剩余的文本（如果有）
+    if (currentIndex < content.length) {
+        parts.push({
+            type: 'text',
+            content: content.slice(currentIndex)
+        });
+    }
+
+    return parts;
+}
+
 // Helper: render formula to png filepath (returns filename)
 async function renderFormulaToPng(formula, options = {}) {
     // Normalize options for stable hashing
@@ -62,8 +99,20 @@ async function renderFormulaToPng(formula, options = {}) {
         // 不存在，继续生成
     }
 
-    const typesetOpts = { math: formula, format: 'TeX', svg: true };
-    if (optsForHash.display) typesetOpts.display = true;
+    // 处理公式：移除包裹的 $ 或 $$
+    let cleanFormula = formula;
+    if (formula.startsWith('$$') && formula.endsWith('$$')) {
+        cleanFormula = formula.slice(2, -2);
+    } else if (formula.startsWith('$') && formula.endsWith('$')) {
+        cleanFormula = formula.slice(1, -1);
+    }
+
+    const typesetOpts = { 
+        math: cleanFormula, 
+        format: 'TeX', 
+        svg: true,
+        display: formula.startsWith('$$')  // 使用 $$ 时设置为 display mode
+    };
     let result;
     try {
         // Log a short preview of the formula for debugging (do not log huge content)
@@ -214,7 +263,7 @@ app.post('/convert', async (req, res) => {
         if (!formula) return res.status(400).json({ error: '请提供 LaTeX 公式' });
 
         const opts = options || {};
-        const { filename, filepath } = await renderFormulaToPng(formula, opts);
+        const { filename } = await renderFormulaToPng(formula, opts);
         const imageUrl = `/images/${filename}`;
         res.json({ url: imageUrl });
     } catch (error) {
@@ -245,7 +294,99 @@ app.post('/png', async (req, res) => {
     }
 });
 
+// API 路由处理混合文本转换
+app.post('/convert-mixed', async (req, res) => {
+    try {
+        const { content, options } = req.body || {};
+        console.log('/convert-mixed received preview:', String(content || '').slice(0,200).replace(/\n/g,'\\n'));
+        if (!content) return res.status(400).json({ error: '请提供内容' });
+
+        const opts = options || {};
+        // 解析混合内容
+        const parts = parseMixedContent(content);
+        
+        // 处理所有部分
+        const result = {
+            parts: []
+        };
+
+        for (const part of parts) {
+            if (part.type === 'text') {
+                // 文本部分直接返回
+                result.parts.push({
+                    type: 'text',
+                    content: part.content
+                });
+            } else {
+                // 公式部分转换为图片
+                const { filename } = await renderFormulaToPng(part.content, {
+                    ...opts,
+                    display: part.isDisplay  // 根据是否是 $$ 设置 display 模式
+                });
+                result.parts.push({
+                    type: 'formula',
+                    content: part.content,
+                    url: `/images/${filename}`
+                });
+            }
+        }
+
+        res.json(result);
+    } catch (error) {
+        console.error('转换错误:', error && error.stack ? error.stack : error);
+        const payload = { error: '转换过程中出现错误' };
+        if (process.env.NODE_ENV !== 'production') payload.detail = String(error && error.message ? error.message : error);
+        res.status(500).json(payload);
+    }
+});
+
 // Development helper: echo back received payload (useful to see what frontend actually sends)
+// 处理混合文本和公式的路由
+app.post('/convert-mixed', async (req, res) => {
+    try {
+        const { content, options } = req.body || {};
+        console.log('/convert-mixed received preview:', String(content || '').slice(0,200).replace(/\n/g,'\\n'));
+        if (!content) return res.status(400).json({ error: '请提供内容' });
+
+        const opts = options || {};
+        // 解析混合内容
+        const parts = parseMixedContent(content);
+        
+        // 处理所有部分
+        const result = {
+            parts: []
+        };
+
+        for (const part of parts) {
+            if (part.type === 'text') {
+                // 文本部分直接返回
+                result.parts.push({
+                    type: 'text',
+                    content: part.content
+                });
+            } else {
+                // 公式部分转换为图片
+                const { filename } = await renderFormulaToPng(part.content, {
+                    ...opts,
+                    display: part.isDisplay  // 根据是否是 $$ 设置 display 模式
+                });
+                result.parts.push({
+                    type: 'formula',
+                    content: part.content,
+                    url: `/images/${filename}`
+                });
+            }
+        }
+
+        res.json(result);
+    } catch (error) {
+        console.error('转换错误:', error && error.stack ? error.stack : error);
+        const payload = { error: '转换过程中出现错误' };
+        if (process.env.NODE_ENV !== 'production') payload.detail = String(error && error.message ? error.message : error);
+        res.status(500).json(payload);
+    }
+});
+
 app.post('/debug-echo', (req, res) => {
     const { formula, options } = req.body || {};
     res.json({ preview: String(formula || '').slice(0, 1000), options: options || {} });
