@@ -40,7 +40,11 @@ async function renderFormulaToPng(formula, options = {}) {
         height: options.height ? Number(options.height) : undefined,
         scale: options.scale ? Number(options.scale) : undefined,
         bgcolor: options.bgcolor || undefined,
-        transparent: options.transparent ? Boolean(options.transparent) : undefined,
+        transparent: (options.transparent === undefined) ? true : Boolean(options.transparent),
+        display: options.display === undefined ? undefined : Boolean(options.display),
+        color: options.color || undefined,
+        fontSize: options.fontSize ? Number(options.fontSize) : undefined,
+        font: options.font || undefined,
     };
 
     const hash = crypto.createHash('md5')
@@ -60,7 +64,21 @@ async function renderFormulaToPng(formula, options = {}) {
 
     const typesetOpts = { math: formula, format: 'TeX', svg: true };
     if (optsForHash.display) typesetOpts.display = true;
-    const result = await mjAPI.typeset(typesetOpts);
+    let result;
+    try {
+        // Log a short preview of the formula for debugging (do not log huge content)
+        const preview = String(formula).slice(0, 200).replace(/\n/g, '\\n');
+        console.log('Typesetting formula preview:', preview);
+        result = await mjAPI.typeset(typesetOpts);
+    } catch (e) {
+        console.error('MathJax typeset failed for formula:', String(formula).slice(0,300));
+        console.error(e && e.stack ? e.stack : e);
+        throw new Error('MathJax typeset failed: ' + (e && e.message ? e.message : String(e)));
+    }
+    if (!result || !result.svg) {
+        console.error('MathJax returned empty SVG result', result);
+        throw new Error('MathJax returned empty SVG');
+    }
     let svg = result.svg;
 
     // Post-process SVG: apply color, fontsize, font-family if provided
@@ -113,13 +131,14 @@ async function renderFormulaToPng(formula, options = {}) {
     }
 
     // Background / transparency
-    if (options.transparent === true || options.transparent === 'true') {
-        // keep alpha
-    } else if (options.bgcolor) {
-        img = img.png().flatten({ background: options.bgcolor });
+    // By default we keep transparent background unless explicit false
+    if (options.transparent === false || options.transparent === 'false') {
+        // force opaque background
+        const bg = options.bgcolor || '#ffffff';
+        img = img.png().flatten({ background: bg });
     } else {
-        // default white background to avoid transparent PNGs
-        img = img.png().flatten({ background: '#ffffff' });
+        // keep alpha (transparent) — client can set transparent=false to flatten
+        img = img.png();
     }
 
     await img.toFile(filepath);
@@ -139,6 +158,10 @@ app.get('/png', async (req, res) => {
             scale: req.query.scale,
             bgcolor: req.query.bgcolor,
             transparent: req.query.transparent,
+            display: req.query.display,
+            color: req.query.color,
+            fontSize: req.query.fontSize,
+            font: req.query.font,
         };
 
         const { filename, filepath } = await renderFormulaToPng(formula, options);
@@ -167,6 +190,10 @@ app.get('/png/b64/:data', async (req, res) => {
             scale: req.query.scale,
             bgcolor: req.query.bgcolor,
             transparent: req.query.transparent,
+            display: req.query.display,
+            color: req.query.color,
+            fontSize: req.query.fontSize,
+            font: req.query.font,
         };
 
         const { filename, filepath } = await renderFormulaToPng(formula, options);
@@ -182,34 +209,19 @@ app.get('/png/b64/:data', async (req, res) => {
 // API 路由处理 LaTeX 公式转换
 app.post('/convert', async (req, res) => {
     try {
-        const { formula } = req.body;
-        if (!formula) {
-            return res.status(400).json({ error: '请提供 LaTeX 公式' });
-        }
+        const { formula, options } = req.body || {};
+        console.log('/convert received preview:', String(formula || '').slice(0,200).replace(/\n/g,'\\n'));
+        if (!formula) return res.status(400).json({ error: '请提供 LaTeX 公式' });
 
-        // 使用 MathJax 将公式转换为 SVG
-        const result = await mjAPI.typeset({
-            math: formula,
-            format: 'TeX',
-            svg: true,
-        });
-
-        // 生成唯一的文件名
-        const hash = crypto.createHash('md5').update(formula).digest('hex');
-        const filename = `${hash}.png`;
-        const filepath = path.join(__dirname, 'public', 'images', filename);
-
-        // 将 SVG 转换为 PNG 并保存
-        await sharp(Buffer.from(result.svg))
-            .png()
-            .toFile(filepath);
-
-        // 返回图片的URL
+        const opts = options || {};
+        const { filename, filepath } = await renderFormulaToPng(formula, opts);
         const imageUrl = `/images/${filename}`;
         res.json({ url: imageUrl });
     } catch (error) {
-        console.error('转换错误:', error);
-        res.status(500).json({ error: '转换过程中出现错误' });
+        console.error('转换错误:', error && error.stack ? error.stack : error);
+        const payload = { error: '转换过程中出现错误' };
+        if (process.env.NODE_ENV !== 'production') payload.detail = String(error && error.message ? error.message : error);
+        res.status(500).json(payload);
     }
 });
 
@@ -217,6 +229,7 @@ app.post('/convert', async (req, res) => {
 app.post('/png', async (req, res) => {
     try {
         const { formula, options } = req.body || {};
+        console.log('/png received preview:', String(formula || '').slice(0,200).replace(/\n/g,'\\n'));
         if (!formula) return res.status(400).json({ error: 'Missing formula' });
 
         const opts = options || {};
@@ -225,9 +238,17 @@ app.post('/png', async (req, res) => {
         res.set('Cache-Control', 'public, max-age=86400');
         res.sendFile(filepath);
     } catch (err) {
-        console.error('/png POST error', err);
-        res.status(500).json({ error: 'Render error' });
+        console.error('/png POST error', err && err.stack ? err.stack : err);
+        const payload = { error: 'Render error' };
+        if (process.env.NODE_ENV !== 'production') payload.detail = String(err && err.message ? err.message : err);
+        res.status(500).json(payload);
     }
+});
+
+// Development helper: echo back received payload (useful to see what frontend actually sends)
+app.post('/debug-echo', (req, res) => {
+    const { formula, options } = req.body || {};
+    res.json({ preview: String(formula || '').slice(0, 1000), options: options || {} });
 });
 
 // 打印环境信息

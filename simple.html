@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LaTeX 转图片工具 - 文字公式混编</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+            padding: 25px;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eaeaea;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 8px;
+            font-size: 1.8rem;
+        }
+        
+        .description {
+            color: #7f8c8d;
+            font-size: 1rem;
+        }
+        
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            background: #f0f0f0;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            border-radius: 5px 5px 0 0;
+            margin-right: 5px;
+        }
+        
+        .tab.active {
+            background: #3498db;
+            color: white;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .main-content {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 25px;
+        }
+        
+        .input-section {
+            flex: 1;
+            min-width: 300px;
+        }
+        
+        .output-section {
+            flex: 1;
+            min-width: 300px;
+        }
+        
+        .mixed-output-section {
+            flex: 1;
+            min-width: 300px;
+        }
+        
+        .mixed-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 25px;
+        }
+        
+        .mixed-layout .input-section,
+        .mixed-layout .mixed-output-section {
+            flex: 1;
+            min-width: 45%;
+        }
+        
+        .section-title {
+            font-size: 1.2rem;
+            color: #3498db;
+            margin-bottom: 12px;
+            padding-bottom: 4px;
+            border-bottom: 2px solid #3498db;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .settings-panel {
+            background-color: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+        }
+        
+        .mixed-settings-panel {
+            grid-template-columns: 1fr 1fr;
+        }
+        
+        .setting-group {
+            margin-bottom: 0;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 500;
+            color: #2c3e50;
+            font-size: 0.85rem;
+        }
+        
+        input, select, textarea {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+        
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+        
+        .mixed-input {
+            min-height: 300px;
+            font-family: monospace;
+        }
+        
+        .color-inputs {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .color-input {
+            flex: 1;
+        }
+        
+        .color-preview {
+            width: 22px;
+            height: 22px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            margin-top: 4px;
+        }
+        
+        .transparent-option {
+            display: flex;
+            align-items: center;
+            margin-top: 4px;
+        }
+        
+        .transparent-option input {
+            width: auto;
+            margin-right: 6px;
+        }
+        
+        .image-container {
+            background-color: #f8f9fa;
+            border-radius: 6px;
+            padding: 15px;
+            min-height: 180px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 15px;
+            border: 1px dashed #ddd;
+        }
+        
+        #latexImage {
+            max-width: 100%;
+            max-height: 350px;
+        }
+        
+        .url-container {
+            background-color: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            font-family: monospace;
+            word-break: break-all;
+            font-size: 0.85rem;
+            border: 1px solid #eaeaea;
+            position: relative;
+            min-height: 80px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .url-container:hover {
+            background-color: #eef5ff;
+        }
+        
+        .url-container.copied {
+            background-color: #e8f5e9;
+        }
+        
+        .copy-hint {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            color: #3498db;
+            font-size: 0.75rem;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .url-container:hover .copy-hint {
+            opacity: 1;
+        }
+        
+        .mixed-output {
+            background-color: #f8f9fa;
+            border-radius: 6px;
+            padding: 15px;
+            min-height: 400px;
+            border: 1px solid #ddd;
+            overflow-y: auto;
+            max-height: 500px;
+            position: relative;
+            user-select: text;
+            -webkit-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
+        }
+        
+        .mixed-output p {
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+        
+        .mixed-output img {
+            vertical-align: middle;
+            margin: 0 5px;
+            max-width: 100%;
+        }
+        
+        .inline-formula {
+            display: inline;
+            margin: 0 2px;
+        }
+        
+        .display-formula {
+            display: block;
+            margin: 10px 0;
+            text-align: center;
+        }
+        
+        .example-formulas {
+            margin-top: 15px;
+        }
+        
+        .example-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        
+        .example-item {
+            background-color: #eef5ff;
+            padding: 6px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: background-color 0.2s;
+        }
+        
+        .example-item:hover {
+            background-color: #d6e4ff;
+        }
+        
+        .mixed-example {
+            margin-top: 10px;
+            font-size: 0.85rem;
+            color: #7f8c8d;
+        }
+        
+        .status-message {
+            margin-top: 8px;
+            font-size: 0.85rem;
+            color: #7f8c8d;
+            text-align: center;
+        }
+        
+        .copy-mixed-button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+        
+        .copy-mixed-button:hover {
+            background-color: #2980b9;
+        }
+        
+        .copy-mixed-button.copied {
+            background-color: #2ecc71;
+        }
+        
+        @media (max-width: 900px) {
+            .settings-panel, .mixed-settings-panel {
+                grid-template-columns: 1fr;
+            }
+            
+            .main-content, .mixed-layout {
+                flex-direction: column;
+            }
+            
+            .mixed-layout .input-section,
+            .mixed-layout .mixed-output-section {
+                min-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>LaTeX 转图片工具 - 文字公式混编</h1>
+            <p class="description">使用CodeCogs API将LaTeX公式转换为图片，支持文字与公式混编</p>
+        </header>
+        
+        <div class="tabs">
+            <div class="tab active" data-tab="single">单公式转换</div>
+            <div class="tab" data-tab="mixed">文字公式混编</div>
+        </div>
+        
+        <div class="tab-content active" id="single-tab">
+            <div class="main-content">
+                <div class="input-section">
+                    <h2 class="section-title">输入与设置</h2>
+                    
+                    <div class="setting-group">
+                        <label for="latexInput">LaTeX 公式</label>
+                        <textarea id="latexInput" placeholder="输入LaTeX公式，例如: \frac{a}{b}">\int_{0}^{\infty} e^{-x^2} dx = \frac{\sqrt{\pi}}{2}</textarea>
+                    </div>
+                    
+                    <div class="settings-panel">
+                        <div class="setting-group">
+                            <label for="outputFormat">输出格式</label>
+                            <select id="outputFormat">
+                                <option value="png">PNG</option>
+                                <option value="gif">GIF</option>
+                                <option value="svg">SVG</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label for="fontSize">字体大小</label>
+                            <select id="fontSize">
+                                <option value="">默认</option>
+                                <option value="\tiny">极小</option>
+                                <option value="\scriptsize">很小</option>
+                                <option value="\footnotesize">较小</option>
+                                <option value="\small">小</option>
+                                <option value="\normalsize" selected>正常</option>
+                                <option value="\large">大</option>
+                                <option value="\Large">较大</option>
+                                <option value="\LARGE">很大</option>
+                                <option value="\huge">特大</option>
+                                <option value="\Huge">极大</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label for="dpi">DPI (分辨率)</label>
+                            <input type="number" id="dpi" min="50" max="300" value="120">
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label for="formulaType">公式类型</label>
+                            <select id="formulaType">
+                                <option value="inline">行内公式 (\(...\))</option>
+                                <option value="display" selected>行间公式 (\(...\))</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label for="fontFamily">公式字体</label>
+                            <select id="fontFamily">
+                                <option value="" selected>默认字体</option>
+                                <option value="mathrm">罗马体 (mathrm)</option>
+                                <option value="mathbf">粗体 (mathbf)</option>
+                                <option value="mathit">斜体 (mathit)</option>
+                                <option value="mathcal">花体 (mathcal)</option>
+                                <option value="mathbb">黑板粗体 (mathbb)</option>
+                                <option value="mathfrak">Fraktur字体 (mathfrak)</option>
+                                <option value="mathsf">等线体 (mathsf)</option>
+                                <option value="mathtt">打字机体 (mathtt)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label>颜色设置</label>
+                            <div class="color-inputs">
+                                <div class="color-input">
+                                    <label for="foregroundColor">前景色</label>
+                                    <input type="color" id="foregroundColor" value="#000000">
+                                    <div class="color-preview" id="fgPreview" style="background-color: #000000;"></div>
+                                </div>
+                                <div class="color-input">
+                                    <label for="backgroundColor">背景色</label>
+                                    <input type="color" id="backgroundColor" value="#ffffff">
+                                    <div class="color-preview" id="bgPreview" style="background-color: #ffffff;"></div>
+                                    <div class="transparent-option">
+                                        <input type="checkbox" id="transparentBg">
+                                        <label for="transparentBg" style="display: inline; font-size: 0.8rem;">透明背景</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="example-formulas">
+                        <h3 class="section-title">示例公式</h3>
+                        <div class="example-list">
+                            <div class="example-item" data-formula="\frac{a}{b}">简单分数</div>
+                            <div class="example-item" data-formula="\int_{0}^{\infty} e^{-x^2} dx = \frac{\sqrt{\pi}}{2}">积分公式</div>
+                            <div class="example-item" data-formula="\sum_{n=1}^{\infty} \frac{1}{n^2} = \frac{\pi^2}{6}">求和公式</div>
+                            <div class="example-item" data-formula="\nabla \times \mathbf{E} = -\frac{\partial \mathbf{B}}{\partial t}">麦克斯韦方程</div>
+                            <div class="example-item" data-formula="F = G \frac{m_1 m_2}{r^2}">万有引力定律</div>
+                            <div class="example-item" data-formula="e^{i\pi} + 1 = 0">欧拉公式</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="output-section">
+                    <h2 class="section-title">输出结果</h2>
+                    
+                    <div class="image-container">
+                        <img id="latexImage" src="" alt="LaTeX公式图片">
+                    </div>
+                    <div class="status-message" id="statusMessage">图片加载中...</div>
+                    
+                    <h3 class="section-title">图片URL</h3>
+                    <div class="url-container" id="imageUrl">
+                        <span class="copy-hint">点击复制</span>
+                        图片URL将显示在这里
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="tab-content" id="mixed-tab">
+            <div class="mixed-layout">
+                <div class="input-section">
+                    <h2 class="section-title">混编输入</h2>
+                    
+                    <div class="setting-group">
+                        <label for="mixedInput">文字与LaTeX公式混编</label>
+                        <textarea id="mixedInput" class="mixed-input" placeholder="输入文字和LaTeX公式，行内公式用 \(...\) 包围，行间公式用 \[...\] 包围">
+例如，我们可以讨论二次方程的解：
+
+二次方程的一般形式为：\[ax^2 + bx + c = 0\]
+
+它的解由以下公式给出：\[x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}\]
+
+其中，\(a\)、\(b\) 和 \(c\) 是常数，且 \(a \neq 0\)。
+
+这个公式被称为"二次公式"，它可以求解任何二次方程。
+                        </textarea>
+                    </div>
+                    
+                    <div class="mixed-example">
+                        <p><strong>使用说明：</strong></p>
+                        <p>行内公式使用反斜杠加括号包围：\(公式\)</p>
+                        <p>行间公式使用反斜杠加方括号包围：\[公式\]</p>
+                    </div>
+                    
+                    <div class="settings-panel mixed-settings-panel">
+                        <div class="setting-group">
+                            <label for="mixedOutputFormat">输出格式</label>
+                            <select id="mixedOutputFormat">
+                                <option value="png">PNG</option>
+                                <option value="gif">GIF</option>
+                                <option value="svg">SVG</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label for="mixedFontSize">字体大小</label>
+                            <select id="mixedFontSize">
+                                <option value="">默认</option>
+                                <option value="\tiny">极小</option>
+                                <option value="\scriptsize">很小</option>
+                                <option value="\footnotesize">较小</option>
+                                <option value="\small">小</option>
+                                <option value="\normalsize" selected>正常</option>
+                                <option value="\large">大</option>
+                                <option value="\Large">较大</option>
+                                <option value="\LARGE">很大</option>
+                                <option value="\huge">特大</option>
+                                <option value="\Huge">极大</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label for="mixedDpi">DPI (分辨率)</label>
+                            <input type="number" id="mixedDpi" min="50" max="300" value="120">
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label for="mixedFontFamily">公式字体</label>
+                            <select id="mixedFontFamily">
+                                <option value="" selected>默认字体</option>
+                                <option value="mathrm">罗马体 (mathrm)</option>
+                                <option value="mathbf">粗体 (mathbf)</option>
+                                <option value="mathit">斜体 (mathit)</option>
+                                <option value="mathcal">花体 (mathcal)</option>
+                                <option value="mathbb">黑板粗体 (mathbb)</option>
+                                <option value="mathfrak">Fraktur字体 (mathfrak)</option>
+                                <option value="mathsf">等线体 (mathsf)</option>
+                                <option value="mathtt">打字机体 (mathtt)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label>颜色设置</label>
+                            <div class="color-inputs">
+                                <div class="color-input">
+                                    <label for="mixedForegroundColor">前景色</label>
+                                    <input type="color" id="mixedForegroundColor" value="#000000">
+                                    <div class="color-preview" id="mixedFgPreview" style="background-color: #000000;"></div>
+                                </div>
+                                <div class="color-input">
+                                    <label for="mixedBackgroundColor">背景色</label>
+                                    <input type="color" id="mixedBackgroundColor" value="#ffffff">
+                                    <div class="color-preview" id="mixedBgPreview" style="background-color: #ffffff;"></div>
+                                    <div class="transparent-option">
+                                        <input type="checkbox" id="mixedTransparentBg">
+                                        <label for="mixedTransparentBg" style="display: inline; font-size: 0.8rem;">透明背景</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mixed-output-section">
+                    <h2 class="section-title">混编输出 <button class="copy-mixed-button" id="copyMixedButton">点击复制预览结果</button></h2>
+                    
+                    <div class="mixed-output" id="mixedOutput">
+                        混编结果将显示在这里
+                    </div>
+                    
+                    <div class="status-message" id="mixedStatusMessage">准备生成混编内容...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 选项卡切换功能
+            const tabs = document.querySelectorAll('.tab');
+            const tabContents = document.querySelectorAll('.tab-content');
+            
+            tabs.forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const tabId = this.getAttribute('data-tab');
+                    
+                    // 更新选项卡状态
+                    tabs.forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // 更新内容区域
+                    tabContents.forEach(content => {
+                        content.classList.remove('active');
+                        if (content.id === `${tabId}-tab`) {
+                            content.classList.add('active');
+                        }
+                    });
+                    
+                    // 如果是混编选项卡，生成混编内容
+                    if (tabId === 'mixed') {
+                        generateMixedContent();
+                    }
+                });
+            });
+            
+            // 单公式转换功能
+            const latexInput = document.getElementById('latexInput');
+            const outputFormat = document.getElementById('outputFormat');
+            const fontSize = document.getElementById('fontSize');
+            const dpi = document.getElementById('dpi');
+            const foregroundColor = document.getElementById('foregroundColor');
+            const backgroundColor = document.getElementById('backgroundColor');
+            const transparentBg = document.getElementById('transparentBg');
+            const formulaType = document.getElementById('formulaType');
+            const fontFamily = document.getElementById('fontFamily');
+            const latexImage = document.getElementById('latexImage');
+            const imageUrl = document.getElementById('imageUrl');
+            const fgPreview = document.getElementById('fgPreview');
+            const bgPreview = document.getElementById('bgPreview');
+            const exampleItems = document.querySelectorAll('.example-item');
+            const statusMessage = document.getElementById('statusMessage');
+            
+            // 混编功能元素
+            const mixedInput = document.getElementById('mixedInput');
+            const mixedOutputFormat = document.getElementById('mixedOutputFormat');
+            const mixedFontSize = document.getElementById('mixedFontSize');
+            const mixedDpi = document.getElementById('mixedDpi');
+            const mixedForegroundColor = document.getElementById('mixedForegroundColor');
+            const mixedBackgroundColor = document.getElementById('mixedBackgroundColor');
+            const mixedTransparentBg = document.getElementById('mixedTransparentBg');
+            const mixedFontFamily = document.getElementById('mixedFontFamily');
+            const mixedOutput = document.getElementById('mixedOutput');
+            const mixedStatusMessage = document.getElementById('mixedStatusMessage');
+            const mixedFgPreview = document.getElementById('mixedFgPreview');
+            const mixedBgPreview = document.getElementById('mixedBgPreview');
+            const copyMixedButton = document.getElementById('copyMixedButton');
+            
+            // 防抖函数，避免频繁请求API
+            let debounceTimer;
+            function debounce(func, delay) {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(func, delay);
+            }
+            
+            // 颜色预览更新（单公式）
+            foregroundColor.addEventListener('input', function() {
+                fgPreview.style.backgroundColor = this.value;
+                renderLatex();
+            });
+            
+            backgroundColor.addEventListener('input', function() {
+                bgPreview.style.backgroundColor = this.value;
+                renderLatex();
+            });
+            
+            // 颜色预览更新（混编）
+            mixedForegroundColor.addEventListener('input', function() {
+                mixedFgPreview.style.backgroundColor = this.value;
+                generateMixedContent();
+            });
+            
+            mixedBackgroundColor.addEventListener('input', function() {
+                mixedBgPreview.style.backgroundColor = this.value;
+                generateMixedContent();
+            });
+            
+            // 透明背景选项（单公式）
+            transparentBg.addEventListener('change', function() {
+                backgroundColor.disabled = this.checked;
+                if (this.checked) {
+                    bgPreview.style.background = 'repeating-linear-gradient(45deg, #f0f0f0, #f0f0f0 5px, #e0e0e0 5px, #e0e0e0 10px)';
+                } else {
+                    bgPreview.style.background = backgroundColor.value;
+                }
+                renderLatex();
+            });
+            
+            // 透明背景选项（混编）
+            mixedTransparentBg.addEventListener('change', function() {
+                mixedBackgroundColor.disabled = this.checked;
+                if (this.checked) {
+                    mixedBgPreview.style.background = 'repeating-linear-gradient(45deg, #f0f0f0, #f0f0f0 5px, #e0e0e0 5px, #e0e0e0 10px)';
+                } else {
+                    mixedBgPreview.style.background = mixedBackgroundColor.value;
+                }
+                generateMixedContent();
+            });
+            
+            // 示例公式点击事件
+            exampleItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    latexInput.value = this.getAttribute('data-formula');
+                    renderLatex();
+                });
+            });
+            
+            // 点击URL复制功能（单公式）
+            imageUrl.addEventListener('click', function() {
+                const urlText = this.textContent.replace('点击复制', '').trim();
+                if (urlText && urlText !== '图片URL将显示在这里') {
+                    copyToClipboard(urlText, this);
+                }
+            });
+            
+            // 复制混编内容功能 - 模拟手动选择内容并复制
+            copyMixedButton.addEventListener('click', function() {
+                // 确保混编输出区域的内容已经生成
+                if (mixedOutput.innerHTML === '混编结果将显示在这里') {
+                    alert('请先生成混编内容');
+                    return;
+                }
+                
+                // 模拟手动选择内容并复制
+                simulateManualCopy(mixedOutput, this);
+            });
+            
+            // 模拟手动选择内容并复制的函数
+            function simulateManualCopy(element, button) {
+                // 创建一个临时的可编辑div
+                const tempDiv = document.createElement('div');
+                tempDiv.style.position = 'fixed';
+                tempDiv.style.left = '-9999px';
+                tempDiv.style.top = '0';
+                tempDiv.style.width = '1px';
+                tempDiv.style.height = '1px';
+                tempDiv.style.overflow = 'hidden';
+                document.body.appendChild(tempDiv);
+                
+                // 将混编内容复制到临时div中
+                tempDiv.innerHTML = element.innerHTML;
+                
+                // 选择临时div中的所有内容
+                const range = document.createRange();
+                range.selectNodeContents(tempDiv);
+                const selection = window.getSelection();
+                selection.removeAllRanges();
+                selection.addRange(range);
+                
+                // 执行复制命令
+                try {
+                    const successful = document.execCommand('copy');
+                    if (successful) {
+                        // 视觉反馈
+                        const originalText = button.textContent;
+                        button.textContent = '已复制!';
+                        button.classList.add('copied');
+                        setTimeout(() => {
+                            button.textContent = originalText;
+                            button.classList.remove('copied');
+                        }, 2000);
+                    } else {
+                        alert('复制失败，请手动选择内容并复制');
+                    }
+                } catch (err) {
+                    console.error('复制失败: ', err);
+                    alert('复制失败，请手动选择内容并复制');
+                }
+                
+                // 清除选择
+                selection.removeAllRanges();
+                
+                // 移除临时div
+                document.body.removeChild(tempDiv);
+            }
+            
+            // 复制到剪贴板函数（用于URL复制）
+            function copyToClipboard(text, element) {
+                navigator.clipboard.writeText(text).then(function() {
+                    // 添加复制成功样式（对于URL容器）
+                    if (element.classList && element.classList.contains('url-container')) {
+                        element.classList.add('copied');
+                        setTimeout(() => {
+                            element.classList.remove('copied');
+                        }, 2000);
+                    }
+                }).catch(function(err) {
+                    console.error('复制失败: ', err);
+                    // 降级方案：使用textarea实现复制
+                    const textArea = document.createElement('textarea');
+                    textArea.value = text;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    try {
+                        document.execCommand('copy');
+                        // 添加复制成功样式（对于URL容器）
+                        if (element.classList && element.classList.contains('url-container')) {
+                            element.classList.add('copied');
+                            setTimeout(() => {
+                                element.classList.remove('copied');
+                            }, 2000);
+                        }
+                    } catch (err) {
+                        alert('复制失败，请手动选择并复制内容');
+                    }
+                    document.body.removeChild(textArea);
+                });
+            }
+            
+            // 渲染单公式LaTeX
+            function renderLatex() {
+                const latexCode = latexInput.value.trim();
+                if (!latexCode) {
+                    statusMessage.textContent = '请输入LaTeX公式';
+                    latexImage.src = '';
+                    imageUrl.innerHTML = '<span class="copy-hint">点击复制</span>图片URL将显示在这里';
+                    return;
+                }
+                
+                statusMessage.textContent = '生成图片中...';
+                
+                // 构建LaTeX命令字符串
+                let latexCommand = buildLatexCommand(
+                    latexCode, 
+                    dpi.value, 
+                    fontSize.value, 
+                    fontFamily.value,
+                    transparentBg.checked,
+                    backgroundColor.value,
+                    foregroundColor.value,
+                    formulaType.value
+                );
+                
+                // 编码LaTeX命令
+                const encodedLatex = encodeURIComponent(latexCommand);
+                
+                // 构建图片URL
+                const format = outputFormat.value;
+                const imageSrc = `https://latex.codecogs.com/${format}.latex?${encodedLatex}`;
+                
+                // 更新图片和URL显示
+                latexImage.src = imageSrc;
+                imageUrl.innerHTML = `<span class="copy-hint">点击复制</span>${imageSrc}`;
+                
+                // 处理图片加载成功
+                latexImage.onload = function() {
+                    statusMessage.textContent = '图片加载完成';
+                };
+                
+                // 处理图片加载错误
+                latexImage.onerror = function() {
+                    statusMessage.textContent = '错误：无法生成图片，请检查公式语法';
+                    imageUrl.innerHTML = '<span class="copy-hint">点击复制</span>生成图片时出错';
+                };
+            }
+            
+            // 生成混编内容
+            function generateMixedContent() {
+                const mixedText = mixedInput.value;
+                if (!mixedText.trim()) {
+                    mixedStatusMessage.textContent = '请输入混编内容';
+                    mixedOutput.innerHTML = '混编结果将显示在这里';
+                    return;
+                }
+                
+                mixedStatusMessage.textContent = '生成混编内容中...';
+                
+                // 使用正则表达式匹配 \(...\) 和 \[...\] 格式的公式
+                const inlineFormulaRegex = /\\\((.*?)\\\)/g;
+                const displayFormulaRegex = /\\\[(.*?)\\\]/g;
+                
+                // 先处理行间公式（\[...\]）
+                let processedText = mixedText;
+                let match;
+                const displayFormulas = [];
+                
+                while ((match = displayFormulaRegex.exec(mixedText)) !== null) {
+                    const formula = match[1].trim();
+                    if (formula) {
+                        // 构建LaTeX命令（行间公式）
+                        const latexCommand = buildLatexCommand(
+                            formula, 
+                            mixedDpi.value, 
+                            mixedFontSize.value, 
+                            mixedFontFamily.value,
+                            mixedTransparentBg.checked,
+                            mixedBackgroundColor.value,
+                            mixedForegroundColor.value,
+                            'display' // 行间公式
+                        );
+                        
+                        // 编码LaTeX命令
+                        const encodedLatex = encodeURIComponent(latexCommand);
+                        
+                        // 构建图片URL
+                        const format = mixedOutputFormat.value;
+                        const imageSrc = `https://latex.codecogs.com/${format}.latex?${encodedLatex}`;
+                        
+                        // 存储公式信息
+                        displayFormulas.push({
+                            original: match[0],
+                            replacement: `<div class="display-formula"><img src="${imageSrc}" alt="${formula}" data-formula="${formula}"></div>`
+                        });
+                    }
+                }
+                
+                // 替换行间公式
+                displayFormulas.forEach(item => {
+                    processedText = processedText.replace(item.original, item.replacement);
+                });
+                
+                // 处理行内公式（\(...\)）
+                const inlineFormulas = [];
+                
+                while ((match = inlineFormulaRegex.exec(processedText)) !== null) {
+                    const formula = match[1].trim();
+                    if (formula) {
+                        // 构建LaTeX命令（行内公式）
+                        const latexCommand = buildLatexCommand(
+                            formula, 
+                            mixedDpi.value, 
+                            mixedFontSize.value, 
+                            mixedFontFamily.value,
+                            mixedTransparentBg.checked,
+                            mixedBackgroundColor.value,
+                            mixedForegroundColor.value,
+                            'inline' // 行内公式
+                        );
+                        
+                        // 编码LaTeX命令
+                        const encodedLatex = encodeURIComponent(latexCommand);
+                        
+                        // 构建图片URL
+                        const format = mixedOutputFormat.value;
+                        const imageSrc = `https://latex.codecogs.com/${format}.latex?${encodedLatex}`;
+                        
+                        // 存储公式信息
+                        inlineFormulas.push({
+                            original: match[0],
+                            replacement: `<img class="inline-formula" src="${imageSrc}" alt="${formula}" data-formula="${formula}">`
+                        });
+                    }
+                }
+                
+                // 替换行内公式
+                inlineFormulas.forEach(item => {
+                    processedText = processedText.replace(item.original, item.replacement);
+                });
+                
+                // 将文本分割成段落
+                const paragraphs = processedText.split('\n');
+                let outputHTML = '';
+                
+                paragraphs.forEach(para => {
+                    if (para.trim()) {
+                        // 检查段落是否包含公式图片
+                        if (para.includes('display-formula') || para.includes('inline-formula')) {
+                            outputHTML += para;
+                        } else {
+                            outputHTML += `<p>${para}</p>`;
+                        }
+                    }
+                });
+                
+                // 更新混编输出
+                mixedOutput.innerHTML = outputHTML;
+                mixedStatusMessage.textContent = '混编内容生成完成';
+                
+                // 处理图片加载错误
+                mixedOutput.querySelectorAll('img').forEach(img => {
+                    img.onerror = function() {
+                        this.alt = '公式图片加载失败: ' + this.getAttribute('data-formula');
+                        this.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjUwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iNTAiIGZpbGw9IiNmZmYiLz48dGV4dCB4PSIxMCIgeT0iMzAiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzAwMCI+5rWL6K+V5paH5a2X5o+S5Lu2PC90ZXh0Pjwvc3ZnPg==';
+                    };
+                });
+            }
+            
+            // 构建LaTeX命令的通用函数
+            function buildLatexCommand(latexCode, dpiValue, fontSizeValue, fontFamilyValue, 
+                                      transparent, bgColor, fgColor, formulaTypeValue) {
+                let latexCommand = '';
+                
+                // 添加DPI设置
+                if (dpiValue) {
+                    latexCommand += `\\dpi{${dpiValue}} `;
+                }
+                
+                // 添加字体大小
+                if (fontSizeValue) {
+                    latexCommand += `${fontSizeValue} `;
+                }
+                
+                // 添加字体族
+                if (fontFamilyValue) {
+                    latexCommand += `\\${fontFamilyValue}{`;
+                }
+                
+                // 添加背景色（如果不是透明）
+                if (!transparent && bgColor !== '#ffffff') {
+                    // 使用RGB格式，这是CodeCogs API支持的格式
+                    latexCommand += `\\bg{rgb,${hexToRgb(bgColor)}} `;
+                }
+                
+                // 添加前景色
+                if (fgColor !== '#000000') {
+                    // 使用RGB格式，这是CodeCogs API支持的格式
+                    latexCommand += `\\color{rgb,${hexToRgb(fgColor)}} `;
+                }
+                
+                // 添加公式类型
+                if (formulaTypeValue === 'inline') {
+                    latexCommand += `\\( ${latexCode} \\)`;
+                } else {
+                    latexCommand += `\\[ ${latexCode} \\]`;
+                }
+                
+                // 如果设置了字体族，需要闭合括号
+                if (fontFamilyValue) {
+                    latexCommand += '}';
+                }
+                
+                return latexCommand;
+            }
+            
+            // 将十六进制颜色转换为RGB格式（0-1范围）
+            function hexToRgb(hex) {
+                // 去除#号
+                hex = hex.replace('#', '');
+                
+                // 解析RGB值
+                let r, g, b;
+                if (hex.length === 3) {
+                    r = parseInt(hex[0] + hex[0], 16) / 255;
+                    g = parseInt(hex[1] + hex[1], 16) / 255;
+                    b = parseInt(hex[2] + hex[2], 16) / 255;
+                } else {
+                    r = parseInt(hex[0] + hex[1], 16) / 255;
+                    g = parseInt(hex[2] + hex[3], 16) / 255;
+                    b = parseInt(hex[4] + hex[5], 16) / 255;
+                }
+                
+                return `${r.toFixed(2)},${g.toFixed(2)},${b.toFixed(2)}`;
+            }
+            
+            // 初始渲染单公式
+            renderLatex();
+            
+            // 监听单公式设置变化，自动渲染
+            const settingsElements = [
+                latexInput, outputFormat, fontSize, dpi, formulaType, fontFamily,
+                foregroundColor, backgroundColor, transparentBg
+            ];
+            
+            settingsElements.forEach(element => {
+                element.addEventListener('input', function() {
+                    debounce(renderLatex, 500); // 500ms防抖
+                });
+                
+                element.addEventListener('change', function() {
+                    renderLatex();
+                });
+            });
+            
+            // 监听混编设置变化，自动生成混编内容
+            const mixedSettingsElements = [
+                mixedInput, mixedOutputFormat, mixedFontSize, mixedDpi, mixedFontFamily,
+                mixedForegroundColor, mixedBackgroundColor, mixedTransparentBg
+            ];
+            
+            mixedSettingsElements.forEach(element => {
+                element.addEventListener('input', function() {
+                    debounce(generateMixedContent, 500); // 500ms防抖
+                });
+                
+                element.addEventListener('change', function() {
+                    generateMixedContent();
+                });
+            });
+        });
+    </script>
+</body>
+</html>

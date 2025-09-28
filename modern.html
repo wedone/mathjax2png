@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LaTeX 转图片工具 - 文字公式混编</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+            padding: 25px;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eaeaea;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 8px;
+            font-size: 1.8rem;
+        }
+        
+        .description {
+            color: #7f8c8d;
+            font-size: 1rem;
+        }
+        
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            background: #f0f0f0;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            border-radius: 5px 5px 0 0;
+            margin-right: 5px;
+        }
+        
+        .tab.active {
+            background: #3498db;
+            color: white;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .main-content {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 25px;
+        }
+        
+        .input-section, .output-section {
+            flex: 1;
+            min-width: 300px;
+        }
+        
+        .section-title {
+            font-size: 1.2rem;
+            color: #3498db;
+            margin-bottom: 12px;
+            padding-bottom: 4px;
+            border-bottom: 2px solid #3498db;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .settings-panel {
+            background-color: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        
+        .setting-group {
+            margin-bottom: 10px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 500;
+            color: #2c3e50;
+            font-size: 0.85rem;
+        }
+        
+        input, select, textarea {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+        
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+            font-family: monospace;
+        }
+        
+        .image-container {
+            background-color: #f8f9fa;
+            border-radius: 6px;
+            padding: 15px;
+            min-height: 180px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 15px;
+            border: 1px dashed #ddd;
+        }
+        
+        #latexImage {
+            max-width: 100%;
+            max-height: 350px;
+        }
+        
+        .url-container {
+            background-color: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            font-family: monospace;
+            word-break: break-all;
+            font-size: 0.85rem;
+            border: 1px solid #eaeaea;
+            position: relative;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .url-container:hover {
+            background-color: #eef5ff;
+        }
+        
+        .url-container.copied {
+            background-color: #e8f5e9;
+        }
+        
+        .copy-hint {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            color: #3498db;
+            font-size: 0.75rem;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .url-container:hover .copy-hint {
+            opacity: 1;
+        }
+        
+        .example-formulas {
+            margin-top: 15px;
+        }
+        
+        .example-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        
+        .example-item {
+            background-color: #eef5ff;
+            padding: 6px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: background-color 0.2s;
+        }
+        
+        .example-item:hover {
+            background-color: #d6e4ff;
+        }
+        
+        .color-inputs {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .color-input {
+            flex: 1;
+        }
+        
+        .color-preview {
+            width: 22px;
+            height: 22px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            margin-top: 4px;
+        }
+        
+        .transparent-option {
+            display: flex;
+            align-items: center;
+            margin-top: 4px;
+        }
+        
+        .transparent-option input {
+            width: auto;
+            margin-right: 6px;
+        }
+        
+        .status-message {
+            margin-top: 8px;
+            font-size: 0.85rem;
+            color: #7f8c8d;
+            text-align: center;
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+            }
+            
+            .settings-panel {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>LaTeX 公式转图片工具</h1>
+            <p class="description">使用 CodeCogs 服务将 LaTeX 公式转换为图片格式</p>
+        </header>
+        
+        <div class="tabs">
+            <div class="tab active" data-tab="single">单公式转换</div>
+            <div class="tab" data-tab="mixed">文字公式混编</div>
+        </div>
+        
+        <div class="tab-content active" id="single-tab">
+            <div class="main-content">
+                <div class="input-section">
+                    <h2 class="section-title">输入与设置</h2>
+                    
+                    <div class="setting-group">
+                        <label for="latexInput">LaTeX 公式</label>
+                        <textarea id="latexInput" placeholder="输入LaTeX公式，例如: \frac{a}{b}">\frac{-b \pm \sqrt{b^2-4ac}}{2a}</textarea>
+                    </div>
+                    
+                    <div class="settings-panel">
+                        <div class="setting-group">
+                            <label for="outputFormat">输出格式</label>
+                            <select id="outputFormat">
+                                <option value="png">PNG</option>
+                                <option value="svg">SVG</option>
+                                <option value="gif">GIF</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label for="fontSize">字体大小</label>
+                            <select id="fontSize">
+                                <option value="\tiny">极小</option>
+                                <option value="\scriptsize">很小</option>
+                                <option value="\footnotesize">较小</option>
+                                <option value="\small">小</option>
+                                <option value="\normalsize" selected>正常</option>
+                                <option value="\large">大</option>
+                                <option value="\Large">较大</option>
+                                <option value="\LARGE">很大</option>
+                                <option value="\huge">特大</option>
+                                <option value="\Huge">极大</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label for="dpi">DPI (分辨率)</label>
+                            <input type="number" id="dpi" min="50" max="300" value="120">
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label for="formulaType">公式类型</label>
+                            <select id="formulaType">
+                                <option value="inline">行内公式 (\(...\))</option>
+                                <option value="display" selected>行间公式 (\[...\])</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label>颜色设置</label>
+                            <div class="color-inputs">
+                                <div class="color-input">
+                                    <label for="foregroundColor">前景色</label>
+                                    <input type="color" id="foregroundColor" value="#000000">
+                                    <div class="color-preview" id="fgPreview"></div>
+                                </div>
+                                <div class="color-input">
+                                    <label for="backgroundColor">背景色</label>
+                                    <input type="color" id="backgroundColor" value="#ffffff">
+                                    <div class="color-preview" id="bgPreview"></div>
+                                    <div class="transparent-option">
+                                        <input type="checkbox" id="transparentBg">
+                                        <label for="transparentBg">透明背景</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="example-formulas">
+                        <h3 class="section-title">示例公式</h3>
+                        <div class="example-list">
+                            <div class="example-item" data-formula="\frac{a}{b}">简单分数</div>
+                            <div class="example-item" data-formula="\int_{0}^{\infty} e^{-x^2} dx = \frac{\sqrt{\pi}}{2}">积分公式</div>
+                            <div class="example-item" data-formula="\sum_{n=1}^{\infty} \frac{1}{n^2} = \frac{\pi^2}{6}">求和公式</div>
+                            <div class="example-item" data-formula="e^{i\pi} + 1 = 0">欧拉公式</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="output-section">
+                    <h2 class="section-title">预览</h2>
+                    <div class="image-container">
+                        <img id="latexImage" alt="LaTeX公式预览">
+                    </div>
+                    <div class="status-message" id="statusMessage">准备就绪</div>
+                    
+                    <h3 class="section-title">图片URL</h3>
+                    <div class="url-container" id="imageUrl">
+                        <span class="copy-hint">点击复制</span>
+                        图片URL将显示在这里
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="tab-content" id="mixed-tab">
+            <div class="main-content">
+                <div class="input-section">
+                    <h2 class="section-title">混编输入</h2>
+                    <div class="setting-group">
+                        <label for="mixedInput">文字与LaTeX公式混编</label>
+                        <textarea id="mixedInput" style="min-height: 200px;" placeholder="输入文字和LaTeX公式，行内公式用 \(...\) 包围，行间公式用 \[...\] 包围">例如：
+
+我们来讨论二次方程的求解过程。二次方程的标准形式是：
+
+\[ax^2 + bx + c = 0\]
+
+它的解可以通过以下公式计算：
+
+\[x = \frac{-b \pm \sqrt{b^2-4ac}}{2a}\]
+
+其中，\(a\)、\(b\) 和 \(c\) 是常数，且 \(a \neq 0\)。</textarea>
+                    </div>
+                    
+                    <div class="settings-panel">
+                        <div class="setting-group">
+                            <label for="mixedDpi">DPI (分辨率)</label>
+                            <input type="number" id="mixedDpi" min="50" max="300" value="120">
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label for="mixedFontSize">字体大小</label>
+                            <select id="mixedFontSize">
+                                <option value="\normalsize" selected>正常</option>
+                                <option value="\small">小</option>
+                                <option value="\large">大</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label>颜色设置</label>
+                            <div class="color-inputs">
+                                <div class="color-input">
+                                    <label for="mixedForegroundColor">公式颜色</label>
+                                    <input type="color" id="mixedForegroundColor" value="#000000">
+                                </div>
+                                <div class="color-input">
+                                    <label for="mixedBackgroundColor">背景色</label>
+                                    <input type="color" id="mixedBackgroundColor" value="#ffffff">
+                                    <div class="transparent-option">
+                                        <input type="checkbox" id="mixedTransparentBg" checked>
+                                        <label for="mixedTransparentBg">透明背景</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="output-section">
+                    <h2 class="section-title">混编预览</h2>
+                    <div id="mixedOutput" style="background: #f8f9fa; border-radius: 6px; padding: 15px; min-height: 200px;">
+                        混编结果将显示在这里
+                    </div>
+                    <div class="status-message" id="mixedStatusMessage">准备就绪</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 获取页面元素
+            const tabs = document.querySelectorAll('.tab');
+            const tabContents = document.querySelectorAll('.tab-content');
+            
+            // 获取单公式相关元素
+            const latexInput = document.getElementById('latexInput');
+            const outputFormat = document.getElementById('outputFormat');
+            const fontSize = document.getElementById('fontSize');
+            const dpi = document.getElementById('dpi');
+            const formulaType = document.getElementById('formulaType');
+            const foregroundColor = document.getElementById('foregroundColor');
+            const backgroundColor = document.getElementById('backgroundColor');
+            const transparentBg = document.getElementById('transparentBg');
+            const latexImage = document.getElementById('latexImage');
+            const imageUrl = document.getElementById('imageUrl');
+            const statusMessage = document.getElementById('statusMessage');
+            const fgPreview = document.getElementById('fgPreview');
+            const bgPreview = document.getElementById('bgPreview');
+            const exampleItems = document.querySelectorAll('.example-item');
+            
+            // 获取混编相关元素
+            const mixedInput = document.getElementById('mixedInput');
+            const mixedDpi = document.getElementById('mixedDpi');
+            const mixedFontSize = document.getElementById('mixedFontSize');
+            const mixedForegroundColor = document.getElementById('mixedForegroundColor');
+            const mixedBackgroundColor = document.getElementById('mixedBackgroundColor');
+            const mixedTransparentBg = document.getElementById('mixedTransparentBg');
+            const mixedOutput = document.getElementById('mixedOutput');
+            const mixedStatusMessage = document.getElementById('mixedStatusMessage');
+            
+            // 选项卡切换
+            tabs.forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const tabId = this.getAttribute('data-tab');
+                    tabs.forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                    tabContents.forEach(content => {
+                        content.classList.remove('active');
+                        if (content.id === `${tabId}-tab`) {
+                            content.classList.add('active');
+                        }
+                    });
+                });
+            });
+            
+            // 防抖函数
+            let debounceTimer;
+            function debounce(func, delay) {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(func, delay);
+            }
+            
+            // 颜色预览更新
+            foregroundColor.addEventListener('input', function() {
+                fgPreview.style.backgroundColor = this.value;
+                renderLatex();
+            });
+            
+            backgroundColor.addEventListener('input', function() {
+                if (!transparentBg.checked) {
+                    bgPreview.style.backgroundColor = this.value;
+                    renderLatex();
+                }
+            });
+            
+            // 透明背景选项
+            transparentBg.addEventListener('change', function() {
+                backgroundColor.disabled = this.checked;
+                if (this.checked) {
+                    bgPreview.style.background = 'repeating-linear-gradient(45deg, #f0f0f0, #f0f0f0 5px, #e0e0e0 5px, #e0e0e0 10px)';
+                } else {
+                    bgPreview.style.backgroundColor = backgroundColor.value;
+                }
+                renderLatex();
+            });
+            
+            // 示例公式点击
+            exampleItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    latexInput.value = this.getAttribute('data-formula');
+                    renderLatex();
+                });
+            });
+            
+            // URL复制功能
+            imageUrl.addEventListener('click', function() {
+                const url = this.textContent;
+                if (url && url !== '图片URL将显示在这里' && url !== '请输入LaTeX公式') {
+                    navigator.clipboard.writeText(url).then(() => {
+                        this.classList.add('copied');
+                        setTimeout(() => {
+                            this.classList.remove('copied');
+                        }, 2000);
+                    });
+                }
+            });
+            
+            // 渲染单个LaTeX公式
+            function renderLatex() {
+                const formula = latexInput.value.trim();
+                if (!formula) {
+                    statusMessage.textContent = '请输入LaTeX公式';
+                    latexImage.src = '';
+                    imageUrl.innerHTML = '<span class="copy-hint">点击复制</span>请输入LaTeX公式';
+                    return;
+                }
+                
+                statusMessage.textContent = '生成图片中...';
+                
+                let latexCommand = '';
+                
+                // 添加字体大小
+                if (fontSize.value) {
+                    latexCommand += `${fontSize.value} `;
+                }
+                
+                // 添加颜色设置
+                if (foregroundColor.value !== '#000000') {
+                    const rgb = hexToRgb(foregroundColor.value);
+                    latexCommand += `\\color{rgb,${rgb}} `;
+                }
+                
+                if (!transparentBg.checked && backgroundColor.value !== '#ffffff') {
+                    const rgb = hexToRgb(backgroundColor.value);
+                    latexCommand += `\\bg{rgb,${rgb}} `;
+                }
+                
+                // 添加公式类型和公式内容
+                if (formulaType.value === 'inline') {
+                    latexCommand += `\\(${formula}\\)`;
+                } else {
+                    latexCommand += `\\[${formula}\\]`;
+                }
+                
+                // 添加DPI设置
+                if (dpi.value) {
+                    latexCommand = `\\dpi{${dpi.value}} ${latexCommand}`;
+                }
+                
+                // 编码并生成URL
+                const encodedLatex = encodeURIComponent(latexCommand);
+                const format = outputFormat.value;
+                const imageSrc = `https://latex.codecogs.com/${format}.latex?${encodedLatex}`;
+                
+                // 更新图片和URL
+                latexImage.src = imageSrc;
+                imageUrl.innerHTML = `<span class="copy-hint">点击复制</span>${imageSrc}`;
+                
+                // 处理加载状态
+                latexImage.onload = () => statusMessage.textContent = '图片生成成功';
+                latexImage.onerror = () => statusMessage.textContent = '图片生成失败，请检查公式语法';
+            }
+            
+            // 渲染混编内容
+            function renderMixed() {
+                const content = mixedInput.value.trim();
+                if (!content) {
+                    mixedStatusMessage.textContent = '请输入混编内容';
+                    mixedOutput.innerHTML = '请输入文字和公式';
+                    return;
+                }
+                
+                mixedStatusMessage.textContent = '生成内容中...';
+                
+                // 分别处理行内公式和行间公式
+                const inlineRegex = /\\\((.*?)\\\)/g;
+                const displayRegex = /\\\[(.*?)\\\]/g;
+                
+                let processedContent = content;
+                let match;
+                
+                // 处理行间公式
+                const displayFormulas = [];
+                while ((match = displayRegex.exec(content)) !== null) {
+                    const formula = match[1].trim();
+                    let latexCommand = '';
+                    
+                    if (mixedFontSize.value) {
+                        latexCommand += `${mixedFontSize.value} `;
+                    }
+                    
+                    if (mixedForegroundColor.value !== '#000000') {
+                        const rgb = hexToRgb(mixedForegroundColor.value);
+                        latexCommand += `\\color{rgb,${rgb}} `;
+                    }
+                    
+                    if (!mixedTransparentBg.checked && mixedBackgroundColor.value !== '#ffffff') {
+                        const rgb = hexToRgb(mixedBackgroundColor.value);
+                        latexCommand += `\\bg{rgb,${rgb}} `;
+                    }
+                    
+                    latexCommand += formula;
+                    
+                    if (mixedDpi.value) {
+                        latexCommand = `\\dpi{${mixedDpi.value}} ${latexCommand}`;
+                    }
+                    
+                    const encodedLatex = encodeURIComponent(latexCommand);
+                    const imageSrc = `https://latex.codecogs.com/png.latex?${encodedLatex}`;
+                    
+                    displayFormulas.push({
+                        original: match[0],
+                        replacement: `<div style="text-align:center;margin:10px 0;"><img src="${imageSrc}" alt="公式" style="max-width:100%;"></div>`
+                    });
+                }
+                
+                // 替换行间公式
+                displayFormulas.forEach(item => {
+                    processedContent = processedContent.replace(item.original, item.replacement);
+                });
+                
+                // 处理行内公式
+                const inlineFormulas = [];
+                while ((match = inlineRegex.exec(processedContent)) !== null) {
+                    const formula = match[1].trim();
+                    let latexCommand = '';
+                    
+                    if (mixedFontSize.value) {
+                        latexCommand += `${mixedFontSize.value} `;
+                    }
+                    
+                    if (mixedForegroundColor.value !== '#000000') {
+                        const rgb = hexToRgb(mixedForegroundColor.value);
+                        latexCommand += `\\color{rgb,${rgb}} `;
+                    }
+                    
+                    if (!mixedTransparentBg.checked && mixedBackgroundColor.value !== '#ffffff') {
+                        const rgb = hexToRgb(mixedBackgroundColor.value);
+                        latexCommand += `\\bg{rgb,${rgb}} `;
+                    }
+                    
+                    latexCommand += formula;
+                    
+                    if (mixedDpi.value) {
+                        latexCommand = `\\dpi{${mixedDpi.value}} ${latexCommand}`;
+                    }
+                    
+                    const encodedLatex = encodeURIComponent(latexCommand);
+                    const imageSrc = `https://latex.codecogs.com/png.latex?${encodedLatex}`;
+                    
+                    inlineFormulas.push({
+                        original: match[0],
+                        replacement: `<img src="${imageSrc}" alt="公式" style="vertical-align:middle;height:1.5em;">`
+                    });
+                }
+                
+                // 替换行内公式
+                inlineFormulas.forEach(item => {
+                    processedContent = processedContent.replace(item.original, item.replacement);
+                });
+                
+                // 处理换行
+                processedContent = processedContent.split('\n\n').map(para => 
+                    para.trim() ? `<p>${para.replace(/\n/g, '<br>')}</p>` : ''
+                ).join('\n');
+                
+                // 更新输出
+                mixedOutput.innerHTML = processedContent;
+                mixedStatusMessage.textContent = '内容生成完成';
+            }
+            
+            // 十六进制颜色转RGB
+            function hexToRgb(hex) {
+                hex = hex.replace('#', '');
+                const r = parseInt(hex.substring(0, 2), 16) / 255;
+                const g = parseInt(hex.substring(2, 4), 16) / 255;
+                const b = parseInt(hex.substring(4, 6), 16) / 255;
+                return `${r.toFixed(2)},${g.toFixed(2)},${b.toFixed(2)}`;
+            }
+            
+            // 监听单公式设置变化
+            [latexInput, outputFormat, fontSize, dpi, formulaType].forEach(element => {
+                element.addEventListener('input', () => debounce(renderLatex, 500));
+                element.addEventListener('change', renderLatex);
+            });
+            
+            // 监听混编设置变化
+            [mixedInput, mixedDpi, mixedFontSize, mixedForegroundColor, mixedBackgroundColor].forEach(element => {
+                element.addEventListener('input', () => debounce(renderMixed, 500));
+                element.addEventListener('change', renderMixed);
+            });
+            
+            mixedTransparentBg.addEventListener('change', renderMixed);
+            
+            // 初始化颜色预览
+            fgPreview.style.backgroundColor = foregroundColor.value;
+            bgPreview.style.backgroundColor = backgroundColor.value;
+            
+            // 初始渲染
+            renderLatex();
+        });
+    </script>
+</body>
+</html>
