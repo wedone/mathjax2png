@@ -28,7 +28,9 @@ async function initMathJax() {
 
 // Helper: render formula to base64
 async function renderFormulaToBase64(formula, options = {}) {
+    const tStart = Date.now();
     await initMathJax();
+    console.log('renderFormulaToBase64: initMathJax elapsed', Date.now() - tStart, 'ms');
     
     // 处理公式：移除包裹的 $ 或 $$
     let cleanFormula = formula;
@@ -45,7 +47,9 @@ async function renderFormulaToBase64(formula, options = {}) {
         display: formula.startsWith('$$')
     };
 
+    console.time('mjAPI.typeset');
     const result = await mjAPI.typeset(typesetOpts);
+    console.timeEnd('mjAPI.typeset');
     if (!result || !result.svg) {
         throw new Error('MathJax returned empty SVG');
     }
@@ -80,6 +84,7 @@ async function renderFormulaToBase64(formula, options = {}) {
     }
 
     const svgBuffer = Buffer.from(svg);
+    console.log('renderFormulaToBase64: svg length', svgBuffer.length);
     const density = options.dpi ? Number(options.dpi) : 96;
     let img = sharp(svgBuffer, { density });
 
@@ -99,7 +104,10 @@ async function renderFormulaToBase64(formula, options = {}) {
         img = img.png();
     }
 
+    console.time('sharp.toBuffer');
     const buffer = await img.toBuffer();
+    console.timeEnd('sharp.toBuffer');
+    console.log('renderFormulaToBase64: png buffer length', buffer.length, 'elapsed', Date.now() - tStart, 'ms');
     return buffer.toString('base64');
 }
 

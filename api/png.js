@@ -23,7 +23,9 @@ module.exports = async (req, res) => {
     }
 
     try {
+        const tStart = Date.now();
         await initMathJax();
+        console.log('/api/png initMathJax elapsed', Date.now() - tStart, 'ms');
         
         const { formula, options = {} } = req.body;
         
@@ -46,7 +48,9 @@ module.exports = async (req, res) => {
             display: formula.startsWith('$$')
         };
 
-        const result = await mjAPI.typeset(typesetOpts);
+    console.time('mjAPI.typeset');
+    const result = await mjAPI.typeset(typesetOpts);
+    console.timeEnd('mjAPI.typeset');
         if (!result || !result.svg) {
             throw new Error('MathJax returned empty SVG');
         }
@@ -99,7 +103,10 @@ module.exports = async (req, res) => {
             img = img.png();
         }
 
-        const buffer = await img.toBuffer();
+    console.time('sharp.toBuffer');
+    const buffer = await img.toBuffer();
+    console.timeEnd('sharp.toBuffer');
+    console.log('/api/png: png buffer length', buffer.length, 'elapsed', Date.now() - tStart, 'ms');
         
         res.setHeader('Content-Type', 'image/png');
         res.setHeader('Cache-Control', 'public, max-age=86400');
